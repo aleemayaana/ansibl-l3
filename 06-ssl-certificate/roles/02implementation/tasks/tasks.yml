@@ -1,0 +1,38 @@
+---
+- name: Install certbot and nginx plugin
+  ansible.builtin.package:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- name: Request SSL certificate
+  ansible.builtin.command:
+    cmd: >
+      certbot certonly --nginx
+      -d {{ domain_name | default('example.com') }}
+      --non-interactive
+      --agree-tos
+      --email {{ admin_email | default('admin@example.com') }}
+    creates: "/etc/letsencrypt/live/{{ domain_name | default('example.com') }}/fullchain.pem"
+
+- name: Configure nginx SSL virtual host
+  ansible.builtin.template:
+    src: nginx_ssl.conf.j2
+    dest: "/etc/nginx/sites-available/{{ domain_name | default('example.com') }}.conf"
+    mode: '0644'
+  notify: reload nginx
+
+- name: Enable nginx SSL site
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ domain_name | default('example.com') }}.conf"
+    dest: "/etc/nginx/sites-enabled/{{ domain_name | default('example.com') }}.conf"
+    state: link
+  notify: reload nginx
+
+- name: Set up certbot auto-renewal cron
+  ansible.builtin.cron:
+    name: "certbot renew"
+    special_time: weekly
+    job: "certbot renew --quiet && systemctl reload nginx"
+    user: root

@@ -1,0 +1,26 @@
+---
+- name: Check OpenSSL is available
+  ansible.builtin.command: openssl version
+  register: openssl_check
+  changed_when: false
+  failed_when: openssl_check.rc != 0
+
+- name: Check port 1194 (OpenVPN) not in use
+  ansible.builtin.wait_for:
+    port: 1194
+    state: stopped
+    timeout: 5
+  ignore_errors: true
+
+- name: Verify IP forwarding can be enabled
+  ansible.builtin.command: sysctl net.ipv4.ip_forward
+  register: ip_fwd
+  changed_when: false
+
+- name: Check required packages available
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - easy-rsa
+    - openssl

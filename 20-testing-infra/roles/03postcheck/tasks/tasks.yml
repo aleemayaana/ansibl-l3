@@ -1,0 +1,44 @@
+---
+- name: Verify molecule is installed
+  ansible.builtin.command: molecule --version
+  register: molecule_ver
+  changed_when: false
+  failed_when: molecule_ver.rc != 0
+
+- name: Verify ansible-lint is installed
+  ansible.builtin.command: ansible-lint --version
+  register: lint_ver
+  changed_when: false
+  failed_when: lint_ver.rc != 0
+
+- name: Verify pytest is installed
+  ansible.builtin.command: pytest --version
+  register: pytest_ver
+  changed_when: false
+  failed_when: pytest_ver.rc != 0
+
+- name: Display testing tool versions
+  ansible.builtin.debug:
+    msg:
+      - "Molecule: {{ molecule_ver.stdout }}"
+      - "Ansible-lint: {{ lint_ver.stdout_lines[0] }}"
+      - "Pytest: {{ pytest_ver.stdout }}"
+
+- name: Run ansible-lint on testing config
+  ansible.builtin.command:
+    cmd: ansible-lint /opt/testing/.ansible-lint
+    chdir: /opt/testing
+  register: lint_run
+  changed_when: false
+  ignore_errors: true
+
+- name: Verify test files exist
+  ansible.builtin.find:
+    paths: /opt/testing/tests
+    patterns: "test_*.py"
+  register: test_files
+
+- name: Assert test files present
+  ansible.builtin.assert:
+    that:
+      - test_files.matched > 0

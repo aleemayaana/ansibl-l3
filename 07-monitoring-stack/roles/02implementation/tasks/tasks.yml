@@ -1,0 +1,67 @@
+---
+- name: Create monitoring directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/monitoring
+    - /opt/monitoring/prometheus
+    - /opt/monitoring/grafana
+
+- name: Deploy Prometheus configuration
+  ansible.builtin.copy:
+    dest: /opt/monitoring/prometheus/prometheus.yml
+    content: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+
+      scrape_configs:
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['localhost:9090']
+
+        - job_name: 'node'
+          static_configs:
+            - targets: ['node-exporter:9100']
+    mode: '0644'
+
+- name: Deploy Docker Compose for monitoring stack
+  ansible.builtin.copy:
+    dest: /opt/monitoring/docker-compose.yml
+    content: |
+      version: '3.8'
+      services:
+        prometheus:
+          image: prom/prometheus:latest
+          ports:
+            - "9090:9090"
+          volumes:
+            - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+          restart: unless-stopped
+
+        grafana:
+          image: grafana/grafana:latest
+          ports:
+            - "3000:3000"
+          environment:
+            - GF_SECURITY_ADMIN_PASSWORD={{ grafana_password | default('admin123') }}
+          volumes:
+            - grafana_data:/var/lib/grafana
+          restart: unless-stopped
+
+        node-exporter:
+          image: prom/node-exporter:latest
+          ports:
+            - "9100:9100"
+          restart: unless-stopped
+
+      volumes:
+        grafana_data:
+    mode: '0644'
+
+- name: Start monitoring stack
+  community.docker.docker_compose_v2:
+    project_src: /opt/monitoring
+    state: present

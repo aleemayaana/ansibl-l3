@@ -1,0 +1,23 @@
+---
+- name: Check certbot is installable
+  ansible.builtin.package:
+    name: certbot
+    state: present
+  check_mode: true
+
+- name: Verify domain is resolvable
+  ansible.builtin.command: "dig +short {{ domain_name | default('example.com') }}"
+  register: dns_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Warn if domain not resolving
+  ansible.builtin.debug:
+    msg: "WARNING: Domain {{ domain_name }} may not be resolving correctly"
+  when: dns_check.stdout == ""
+
+- name: Check port 80 is open (required for ACME challenge)
+  ansible.builtin.wait_for:
+    port: 80
+    timeout: 5
+  ignore_errors: true

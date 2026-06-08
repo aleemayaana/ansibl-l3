@@ -1,0 +1,54 @@
+---
+- name: Install backup tools
+  ansible.builtin.package:
+    name:
+      - rsync
+      - tar
+      - gzip
+    state: present
+
+- name: Create backup directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0750'
+    owner: root
+  loop:
+    - /var/backups/ansible
+    - /var/backups/ansible/daily
+    - /var/backups/ansible/weekly
+    - /var/backups/ansible/monthly
+
+- name: Deploy backup script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/ansible-backup.sh
+    mode: '0750'
+    content: |
+      #!/bin/bash
+      BACKUP_DIR="/var/backups/ansible/daily"
+      DATE=$(date +%Y%m%d_%H%M%S)
+      SOURCES="{{ backup_sources | default('/etc /home /var/log') }}"
+      DEST="$BACKUP_DIR/backup_$DATE.tar.gz"
+
+      tar -czf "$DEST" $SOURCES 2>/dev/null
+      echo "Backup completed: $DEST"
+
+      # Retain last 7 daily backups
+      find "$BACKUP_DIR" -name "*.tar.gz" -mtime +7 -delete
+
+- name: Schedule daily backup cron job
+  ansible.builtin.cron:
+    name: "Daily system backup"
+    minute: "0"
+    hour: "2"
+    job: "/usr/local/bin/ansible-backup.sh >> /var/log/ansible-backup.log 2>&1"
+    user: root
+
+- name: Schedule weekly backup cron job
+  ansible.builtin.cron:
+    name: "Weekly system backup"
+    minute: "0"
+    hour: "3"
+    weekday: "0"
+    job: "cp $(ls -t /var/backups/ansible/daily/*.tar.gz | head -1) /var/backups/ansible/weekly/"
+    user: root

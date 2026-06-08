@@ -1,0 +1,28 @@
+---
+- name: Verify sysstat is enabled
+  ansible.builtin.command: grep 'ENABLED="true"' /etc/default/sysstat
+  register: sysstat_check
+  changed_when: false
+  failed_when: sysstat_check.rc != 0
+
+- name: Verify Node Exporter is running
+  ansible.builtin.service_facts:
+
+- name: Assert node_exporter active
+  ansible.builtin.assert:
+    that:
+      - "'node_exporter' in services"
+      - "services['node_exporter'].state == 'running'"
+
+- name: Check Node Exporter metrics endpoint
+  ansible.builtin.uri:
+    url: http://localhost:9100/metrics
+    return_content: false
+  register: metrics_check
+  failed_when: metrics_check.status != 200
+
+- name: Run sar to verify sysstat working
+  ansible.builtin.command: sar -u 1 1
+  register: sar_output
+  changed_when: false
+  ignore_errors: true

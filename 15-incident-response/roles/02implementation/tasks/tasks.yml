@@ -1,0 +1,69 @@
+---
+- name: Install incident response tools
+  ansible.builtin.package:
+    name:
+      - logwatch
+      - fail2ban
+      - auditd
+      - aide
+    state: present
+
+- name: Configure fail2ban
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime  = 3600
+      findtime = 600
+      maxretry = 5
+      destemail = {{ alert_email | default('root@localhost') }}
+      action = %(action_mwl)s
+
+      [sshd]
+      enabled = true
+      port    = {{ ssh_port | default(22) }}
+      logpath = %(sshd_log)s
+
+      [nginx-http-auth]
+      enabled = true
+  notify: restart fail2ban
+
+- name: Enable and start fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+- name: Configure auditd rules
+  ansible.builtin.copy:
+    dest: /etc/audit/rules.d/incident.rules
+    content: |
+      # Monitor authentication events
+      -w /etc/passwd -p wa -k identity
+      -w /etc/shadow -p wa -k identity
+      -w /etc/sudoers -p wa -k sudoers
+      # Monitor network changes
+      -a always,exit -F arch=b64 -S sethostname -S setdomainname -k system-locale
+      # Monitor privileged commands
+      -a always,exit -F path=/usr/bin/sudo -F perm=x -F auid>=1000 -k privileged
+  notify: restart auditd
+
+- name: Deploy incident response runbook script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/incident-collect.sh
+    mode: '0750'
+    content: |
+      #!/bin/bash
+      IR_DIR="/var/incident-response/$(date +%Y%m%d_%H%M%S)"
+      mkdir -p "$IR_DIR"
+
+      echo "Collecting system state..."
+      ps aux > "$IR_DIR/processes.txt"
+      netstat -tulpn > "$IR_DIR/network.txt" 2>/dev/null || ss -tulpn > "$IR_DIR/network.txt"
+      last > "$IR_DIR/logins.txt"
+      journalctl -n 500 > "$IR_DIR/journal.txt"
+      find /tmp /var/tmp -type f -newer /proc/1 > "$IR_DIR/new_tmp_files.txt"
+      cp /var/log/auth.log "$IR_DIR/" 2>/dev/null || cp /var/log/secure "$IR_DIR/" 2>/dev/null
+      tar -czf "${IR_DIR}.tar.gz" "$IR_DIR"
+      rm -rf "$IR_DIR"
+      echo "IR data collected: ${IR_DIR}.tar.gz"

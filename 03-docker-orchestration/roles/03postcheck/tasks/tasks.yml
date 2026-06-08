@@ -1,0 +1,22 @@
+---
+- name: Verify Docker service is running
+  ansible.builtin.service_facts:
+
+- name: Assert Docker is active
+  ansible.builtin.assert:
+    that:
+      - "'docker' in services"
+      - "services['docker'].state == 'running'"
+
+- name: Run hello-world container test
+  community.docker.docker_container:
+    name: hello-test
+    image: hello-world
+    state: started
+    auto_remove: true
+
+- name: Verify docker compose plugin works
+  ansible.builtin.command: docker compose version
+  register: compose_check
+  changed_when: false
+  failed_when: compose_check.rc != 0

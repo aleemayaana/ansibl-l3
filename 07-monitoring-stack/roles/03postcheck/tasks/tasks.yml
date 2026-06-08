@@ -1,0 +1,30 @@
+---
+- name: Wait for Prometheus to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 9090
+    timeout: 60
+
+- name: Wait for Grafana to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 3000
+    timeout: 60
+
+- name: Verify Prometheus API responds
+  ansible.builtin.uri:
+    url: http://localhost:9090/-/healthy
+    return_content: true
+  register: prom_health
+
+- name: Assert Prometheus healthy
+  ansible.builtin.assert:
+    that:
+      - prom_health.status == 200
+
+- name: Verify Node Exporter metrics available
+  ansible.builtin.uri:
+    url: http://localhost:9100/metrics
+    return_content: false
+  register: node_metrics
+  failed_when: node_metrics.status != 200

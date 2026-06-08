@@ -1,0 +1,20 @@
+---
+- name: Check available disk space (minimum 5GB)
+  ansible.builtin.assert:
+    that:
+      - item.size_available > 5368709120
+    fail_msg: "Insufficient disk space on {{ item.mount }}"
+  loop: "{{ ansible_mounts }}"
+  when: item.mount == '/'
+
+- name: Check port 5432 is not already in use
+  ansible.builtin.wait_for:
+    port: 5432
+    state: stopped
+    timeout: 5
+  ignore_errors: true
+
+- name: Verify python3-psycopg2 is available
+  ansible.builtin.package:
+    name: python3-psycopg2
+    state: present

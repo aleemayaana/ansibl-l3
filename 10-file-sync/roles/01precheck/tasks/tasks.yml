@@ -1,0 +1,24 @@
+---
+- name: Check rsync version
+  ansible.builtin.command: rsync --version
+  register: rsync_ver
+  changed_when: false
+  failed_when: rsync_ver.rc != 0
+
+- name: Verify source directory exists
+  ansible.builtin.stat:
+    path: "{{ sync_source | default('/var/data') }}"
+  register: source_dir
+
+- name: Warn if source directory missing
+  ansible.builtin.debug:
+    msg: "WARNING: Source directory {{ sync_source | default('/var/data') }} does not exist"
+  when: not source_dir.stat.exists
+
+- name: Check SSH connectivity to sync targets
+  ansible.builtin.wait_for:
+    host: "{{ item }}"
+    port: 22
+    timeout: 10
+  loop: "{{ sync_targets | default([]) }}"
+  ignore_errors: true

@@ -1,0 +1,20 @@
+---
+- name: Check backup destination is writable
+  ansible.builtin.file:
+    path: "{{ backup_dest | default('/var/backups/ansible') }}"
+    state: directory
+    mode: '0750'
+
+- name: Verify available space on backup destination
+  ansible.builtin.assert:
+    that:
+      - item.size_available > 1073741824
+    fail_msg: "Less than 1GB free on backup destination"
+  loop: "{{ ansible_mounts }}"
+  when: item.mount == '/'
+
+- name: Check rsync is available
+  ansible.builtin.command: rsync --version
+  register: rsync_check
+  changed_when: false
+  failed_when: rsync_check.rc != 0

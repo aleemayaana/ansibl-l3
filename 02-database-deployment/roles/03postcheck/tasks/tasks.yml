@@ -1,0 +1,24 @@
+---
+- name: Verify PostgreSQL is running
+  ansible.builtin.service_facts:
+
+- name: Assert PostgreSQL is active
+  ansible.builtin.assert:
+    that:
+      - "'postgresql' in services"
+      - "services['postgresql'].state == 'running'"
+
+- name: Verify database exists
+  community.postgresql.postgresql_db:
+    name: "{{ db_name | default('appdb') }}"
+    state: present
+  become: true
+  become_user: postgres
+  check_mode: true
+
+- name: Verify DB user can connect
+  community.postgresql.postgresql_ping:
+    db: "{{ db_name | default('appdb') }}"
+    login_user: "{{ db_user | default('appuser') }}"
+    login_password: "{{ db_password | default('changeme') }}"
+    login_host: 127.0.0.1

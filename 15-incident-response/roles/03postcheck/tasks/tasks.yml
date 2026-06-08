@@ -1,0 +1,31 @@
+---
+- name: Verify fail2ban is running
+  ansible.builtin.service_facts:
+
+- name: Assert fail2ban active
+  ansible.builtin.assert:
+    that:
+      - "'fail2ban' in services"
+      - "services['fail2ban'].state == 'running'"
+
+- name: Verify auditd is running
+  ansible.builtin.assert:
+    that:
+      - "'auditd' in services"
+      - "services['auditd'].state == 'running'"
+
+- name: Check audit rules are loaded
+  ansible.builtin.command: auditctl -l
+  register: audit_rules
+  changed_when: false
+
+- name: Assert incident rules present
+  ansible.builtin.assert:
+    that:
+      - "'identity' in audit_rules.stdout"
+
+- name: Run IR collection script test
+  ansible.builtin.command: /usr/local/bin/incident-collect.sh
+  register: ir_test
+  changed_when: false
+  ignore_errors: true

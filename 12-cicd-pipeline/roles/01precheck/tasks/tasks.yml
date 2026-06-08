@@ -1,0 +1,25 @@
+---
+- name: Check Java is available (Jenkins requirement)
+  ansible.builtin.command: java -version
+  register: java_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Check port 8080 is free for Jenkins
+  ansible.builtin.wait_for:
+    port: 8080
+    state: stopped
+    timeout: 5
+  ignore_errors: true
+
+- name: Check available disk space (min 10GB)
+  ansible.builtin.assert:
+    that:
+      - item.size_available > 10737418240
+    loop: "{{ ansible_mounts }}"
+    when: item.mount == '/'
+
+- name: Verify git is installed
+  ansible.builtin.package:
+    name: git
+    state: present

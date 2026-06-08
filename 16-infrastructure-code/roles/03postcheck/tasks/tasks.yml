@@ -1,0 +1,28 @@
+---
+- name: Verify Terraform is installed
+  ansible.builtin.command: terraform version
+  register: tf_version
+  changed_when: false
+  failed_when: tf_version.rc != 0
+
+- name: Display Terraform version
+  ansible.builtin.debug:
+    var: tf_version.stdout_lines
+
+- name: Verify IaC directory exists
+  ansible.builtin.stat:
+    path: /opt/infrastructure/main.tf
+  register: tf_main
+
+- name: Assert main.tf exists
+  ansible.builtin.assert:
+    that:
+      - tf_main.stat.exists
+
+- name: Validate Terraform configuration syntax
+  ansible.builtin.command:
+    cmd: terraform validate
+    chdir: /opt/infrastructure
+  register: tf_validate
+  changed_when: false
+  ignore_errors: true

@@ -1,0 +1,25 @@
+---
+- name: Check OS is supported
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family in ['RedHat', 'Debian']
+    fail_msg: "Dev environment only supports RHEL/Debian families"
+
+- name: Check internet connectivity
+  ansible.builtin.uri:
+    url: https://www.google.com
+    return_content: false
+    timeout: 10
+  register: internet_check
+  ignore_errors: true
+
+- name: Warn if no internet
+  ansible.builtin.debug:
+    msg: "WARNING: No internet connectivity - some packages may not install"
+  when: internet_check.status is not defined or internet_check.status != 200
+
+- name: Verify sudo access
+  ansible.builtin.command: sudo -n true
+  register: sudo_check
+  changed_when: false
+  failed_when: sudo_check.rc != 0

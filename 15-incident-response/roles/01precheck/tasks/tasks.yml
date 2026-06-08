@@ -1,0 +1,27 @@
+---
+- name: Gather system facts for baseline
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+      - hardware
+
+- name: Check alert email is configured
+  ansible.builtin.assert:
+    that:
+      - alert_email is defined
+    fail_msg: "alert_email variable must be set"
+  ignore_errors: true
+
+- name: Verify mail utilities available
+  ansible.builtin.package:
+    name: mailutils
+    state: present
+  ignore_errors: true
+
+- name: Check disk usage is not critical
+  ansible.builtin.assert:
+    that:
+      - item.size_available > (item.size_total * 0.1)
+    loop: "{{ ansible_mounts }}"
+    fail_msg: "Critical disk usage on {{ item.mount }}"
+  when: item.mount in ['/', '/var', '/tmp']

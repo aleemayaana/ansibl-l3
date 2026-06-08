@@ -1,0 +1,47 @@
+---
+- name: Install Java 17
+  ansible.builtin.package:
+    name: openjdk-17-jdk
+    state: present
+
+- name: Add Jenkins repository key
+  ansible.builtin.apt_key:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+    state: present
+
+- name: Add Jenkins repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://pkg.jenkins.io/debian-stable binary/"
+    state: present
+
+- name: Install Jenkins
+  ansible.builtin.package:
+    name: jenkins
+    state: present
+
+- name: Start and enable Jenkins
+  ansible.builtin.service:
+    name: jenkins
+    state: started
+    enabled: true
+
+- name: Install Git and build tools
+  ansible.builtin.package:
+    name:
+      - git
+      - maven
+      - docker-ce
+    state: present
+
+- name: Add Jenkins user to docker group
+  ansible.builtin.user:
+    name: jenkins
+    groups: docker
+    append: true
+
+- name: Configure Jenkins JVM options
+  ansible.builtin.lineinfile:
+    path: /etc/default/jenkins
+    regexp: '^JAVA_ARGS'
+    line: 'JAVA_ARGS="-Djava.awt.headless=true -Xmx512m"'
+  notify: restart jenkins

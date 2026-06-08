@@ -1,0 +1,30 @@
+---
+- name: Run sync script test
+  ansible.builtin.command: /usr/local/bin/file-sync.sh
+  register: sync_test
+  changed_when: false
+
+- name: Assert sync completed successfully
+  ansible.builtin.assert:
+    that:
+      - sync_test.rc == 0
+
+- name: Verify cron is scheduled
+  ansible.builtin.command: crontab -l -u root
+  register: cron_check
+  changed_when: false
+
+- name: Assert sync cron exists
+  ansible.builtin.assert:
+    that:
+      - "'File sync' in cron_check.stdout"
+
+- name: Verify sync log exists
+  ansible.builtin.stat:
+    path: /var/log/file-sync.log
+  register: sync_log
+
+- name: Assert log file present
+  ansible.builtin.assert:
+    that:
+      - sync_log.stat.exists

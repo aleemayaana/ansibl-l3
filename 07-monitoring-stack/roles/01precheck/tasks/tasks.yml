@@ -1,0 +1,24 @@
+---
+- name: Check available memory (min 1GB for monitoring stack)
+  ansible.builtin.assert:
+    that:
+      - ansible_memtotal_mb >= 1024
+    fail_msg: "Need at least 1GB RAM for monitoring stack"
+
+- name: Check ports 9090, 3000, 9100 are free
+  ansible.builtin.wait_for:
+    port: "{{ item }}"
+    state: stopped
+    timeout: 5
+  loop: [9090, 3000, 9100]
+  ignore_errors: true
+
+- name: Verify Docker is running
+  ansible.builtin.service_facts:
+
+- name: Assert Docker available
+  ansible.builtin.assert:
+    that:
+      - "'docker' in services"
+      - "services['docker'].state == 'running'"
+    fail_msg: "Docker must be installed first (run 03-docker-orchestration)"

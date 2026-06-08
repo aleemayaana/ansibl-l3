@@ -1,0 +1,67 @@
+---
+- name: Install base development tools
+  ansible.builtin.package:
+    name:
+      - git
+      - curl
+      - wget
+      - vim
+      - tmux
+      - build-essential
+      - python3
+      - python3-pip
+      - python3-venv
+      - jq
+      - tree
+      - htop
+    state: present
+
+- name: Install Node.js via NodeSource
+  ansible.builtin.shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+  args:
+    creates: /usr/bin/node
+
+- name: Install Python development tools via pip
+  ansible.builtin.pip:
+    name:
+      - ansible
+      - ansible-lint
+      - molecule
+      - pytest
+      - black
+      - flake8
+    state: present
+    extra_args: --user
+  become: false
+
+- name: Configure global git settings
+  community.general.git_config:
+    name: "{{ item.name }}"
+    scope: global
+    value: "{{ item.value }}"
+  loop:
+    - { name: core.editor,       value: "vim" }
+    - { name: pull.rebase,       value: "false" }
+    - { name: init.defaultBranch, value: "main" }
+  become: false
+
+- name: Create developer workspace directory
+  ansible.builtin.file:
+    path: "{{ developer_workspace | default('~/workspace') }}"
+    state: directory
+    mode: '0755'
+  become: false
+
+- name: Install VS Code extensions list
+  ansible.builtin.copy:
+    dest: "{{ developer_workspace | default('~/workspace') }}/.vscode-extensions.txt"
+    content: |
+      ms-python.python
+      redhat.ansible
+      hashicorp.terraform
+      ms-azuretools.vscode-docker
+      eamodio.gitlens
+    mode: '0644'
+  become: false

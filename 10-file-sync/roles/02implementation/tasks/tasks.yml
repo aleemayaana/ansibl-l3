@@ -1,0 +1,58 @@
+---
+- name: Install rsync and inotify-tools
+  ansible.builtin.package:
+    name:
+      - rsync
+      - inotify-tools
+    state: present
+
+- name: Create sync directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ sync_source | default('/var/data') }}"
+    - "{{ sync_dest | default('/var/data-sync') }}"
+
+- name: Deploy file sync script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/file-sync.sh
+    mode: '0750'
+    content: |
+      #!/bin/bash
+      SRC="{{ sync_source | default('/var/data') }}/"
+      DEST="{{ sync_dest | default('/var/data-sync') }}/"
+      LOG="/var/log/file-sync.log"
+
+      rsync -avz --delete \
+        --exclude='*.tmp' \
+        --exclude='.git' \
+        "$SRC" "$DEST" >> "$LOG" 2>&1
+
+      echo "[$(date)] Sync completed: $SRC -> $DEST" >> "$LOG"
+
+- name: Schedule sync cron job every 15 minutes
+  ansible.builtin.cron:
+    name: "File sync"
+    minute: "*/15"
+    job: "/usr/local/bin/file-sync.sh"
+    user: root
+
+- name: Deploy inotify watch service for real-time sync
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/file-watch.service
+    content: |
+      [Unit]
+      Description=File Watch Sync Service
+      After=network.target
+
+      [Service]
+      ExecStart=/bin/bash -c 'inotifywait -m -r -e modify,create,delete {{ sync_source | default("/var/data") }} | while read; do /usr/local/bin/file-sync.sh; done'
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - reload systemd
+    - restart file-watch

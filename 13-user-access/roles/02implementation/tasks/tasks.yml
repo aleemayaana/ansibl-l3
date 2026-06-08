@@ -1,0 +1,51 @@
+---
+- name: Create groups
+  ansible.builtin.group:
+    name: "{{ item.name }}"
+    gid: "{{ item.gid | default(omit) }}"
+    state: present
+  loop: "{{ user_groups | default([{'name': 'developers'}, {'name': 'ops'}]) }}"
+
+- name: Create users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    groups: "{{ item.groups | default(omit) }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    create_home: true
+    state: present
+  loop: "{{ managed_users | default([]) }}"
+
+- name: Set authorized SSH keys
+  ansible.posix.authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.ssh_key }}"
+    state: present
+    exclusive: true
+  loop: "{{ managed_users | default([]) }}"
+  when: item.ssh_key is defined
+
+- name: Configure sudo access for ops group
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/ops
+    content: |
+      %ops ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /usr/bin/journalctl
+    mode: '0440'
+    validate: 'visudo -cf %s'
+
+- name: Lock inactive accounts
+  ansible.builtin.user:
+    name: "{{ item }}"
+    password_lock: true
+  loop: "{{ locked_users | default([]) }}"
+
+- name: Configure password policy via PAM
+  ansible.builtin.lineinfile:
+    path: /etc/security/pwquality.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: '^minlen',  line: 'minlen = 14' }
+    - { regexp: '^dcredit', line: 'dcredit = -1' }
+    - { regexp: '^ucredit', line: 'ucredit = -1' }
+    - { regexp: '^lcredit', line: 'lcredit = -1' }
+    - { regexp: '^ocredit', line: 'ocredit = -1' }

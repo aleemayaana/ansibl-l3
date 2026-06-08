@@ -1,0 +1,31 @@
+---
+- name: Verify backup script exists and is executable
+  ansible.builtin.stat:
+    path: /usr/local/bin/ansible-backup.sh
+  register: backup_script
+
+- name: Assert backup script is in place
+  ansible.builtin.assert:
+    that:
+      - backup_script.stat.exists
+      - backup_script.stat.executable
+
+- name: Run a test backup
+  ansible.builtin.command: /usr/local/bin/ansible-backup.sh
+  register: backup_test
+  changed_when: false
+
+- name: Assert backup ran successfully
+  ansible.builtin.assert:
+    that:
+      - backup_test.rc == 0
+
+- name: Verify cron job is scheduled
+  ansible.builtin.command: crontab -l -u root
+  register: cron_list
+  changed_when: false
+
+- name: Assert backup cron exists
+  ansible.builtin.assert:
+    that:
+      - "'ansible-backup' in cron_list.stdout"

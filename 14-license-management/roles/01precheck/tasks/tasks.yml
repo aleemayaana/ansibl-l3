@@ -1,0 +1,24 @@
+---
+- name: Check license server port availability
+  ansible.builtin.wait_for:
+    port: "{{ license_server_port | default(27000) }}"
+    state: stopped
+    timeout: 5
+  ignore_errors: true
+
+- name: Verify license file exists
+  ansible.builtin.stat:
+    path: "{{ license_file | default('/etc/licenses/app.lic') }}"
+  register: lic_file
+
+- name: Warn if license file missing
+  ansible.builtin.debug:
+    msg: "WARNING: License file not found at {{ license_file | default('/etc/licenses/app.lic') }}"
+  when: not lic_file.stat.exists
+
+- name: Check available disk space for audit logs
+  ansible.builtin.assert:
+    that:
+      - item.size_available > 536870912
+    loop: "{{ ansible_mounts }}"
+    when: item.mount == '/'

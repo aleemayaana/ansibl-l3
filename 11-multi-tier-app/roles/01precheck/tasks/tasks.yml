@@ -1,0 +1,22 @@
+---
+- name: Verify all tiers are reachable
+  ansible.builtin.wait_for:
+    host: "{{ item }}"
+    port: 22
+    timeout: 10
+  loop: "{{ groups['all'] }}"
+  ignore_errors: true
+
+- name: Check required ports are free
+  ansible.builtin.wait_for:
+    port: "{{ item }}"
+    state: stopped
+    timeout: 5
+  loop: [80, 443, 8080, 5432]
+  ignore_errors: true
+
+- name: Verify minimum RAM on app servers
+  ansible.builtin.assert:
+    that:
+      - ansible_memtotal_mb >= 2048
+    fail_msg: "App tier needs at least 2GB RAM"

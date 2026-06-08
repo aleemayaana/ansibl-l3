@@ -1,0 +1,47 @@
+---
+- name: Install OpenVPN and EasyRSA
+  ansible.builtin.package:
+    name:
+      - openvpn
+      - easy-rsa
+    state: present
+
+- name: Create EasyRSA directory
+  ansible.builtin.file:
+    path: /etc/openvpn/easy-rsa
+    state: directory
+    mode: '0750'
+
+- name: Initialize PKI
+  ansible.builtin.command:
+    cmd: easyrsa init-pki
+    chdir: /etc/openvpn/easy-rsa
+    creates: /etc/openvpn/easy-rsa/pki
+
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Configure SSH hardening
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: true
+  loop:
+    - { regexp: '^Protocol',            line: 'Protocol 2' }
+    - { regexp: '^MaxAuthTries',        line: 'MaxAuthTries 3' }
+    - { regexp: '^LoginGraceTime',      line: 'LoginGraceTime 60' }
+    - { regexp: '^AllowAgentForwarding',line: 'AllowAgentForwarding no' }
+    - { regexp: '^X11Forwarding',       line: 'X11Forwarding no' }
+  notify: restart sshd
+
+- name: Ensure OpenVPN is enabled
+  ansible.builtin.service:
+    name: openvpn
+    state: started
+    enabled: true

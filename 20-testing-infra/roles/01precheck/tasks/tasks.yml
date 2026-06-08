@@ -1,0 +1,20 @@
+---
+- name: Check Python3 is available
+  ansible.builtin.command: python3 --version
+  register: py_check
+  changed_when: false
+  failed_when: py_check.rc != 0
+
+- name: Verify Docker is available for molecule tests
+  ansible.builtin.service_facts:
+
+- name: Warn if Docker not running
+  ansible.builtin.debug:
+    msg: "WARNING: Docker not running - molecule tests may fail"
+  when: "'docker' not in services or services['docker'].state != 'running'"
+
+- name: Check pip3 is available
+  ansible.builtin.command: pip3 --version
+  register: pip_check
+  changed_when: false
+  failed_when: pip_check.rc != 0

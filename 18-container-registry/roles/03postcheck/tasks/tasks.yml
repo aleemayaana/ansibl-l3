@@ -1,0 +1,30 @@
+---
+- name: Wait for registry to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 5000
+    timeout: 30
+
+- name: Verify registry is accessible
+  ansible.builtin.uri:
+    url: "https://localhost:5000/v2/"
+    validate_certs: false
+    user: "{{ registry_user | default('admin') }}"
+    password: "{{ registry_password | default('changeme') }}"
+    force_basic_auth: true
+  register: registry_check
+  failed_when: registry_check.status not in [200, 401]
+
+- name: Display registry status
+  ansible.builtin.debug:
+    msg: "Registry is running at https://{{ registry_domain | default('registry.local') }}:5000"
+
+- name: Verify registry data directory exists
+  ansible.builtin.stat:
+    path: /opt/registry/data
+  register: reg_data
+
+- name: Assert registry data dir present
+  ansible.builtin.assert:
+    that:
+      - reg_data.stat.exists

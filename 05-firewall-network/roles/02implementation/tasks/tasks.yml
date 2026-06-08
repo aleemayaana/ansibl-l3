@@ -1,0 +1,57 @@
+---
+- name: Install UFW
+  ansible.builtin.package:
+    name: ufw
+    state: present
+
+- name: Reset UFW to defaults
+  community.general.ufw:
+    state: reset
+
+- name: Set default policies
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: deny }
+    - { direction: outgoing, policy: allow }
+    - { direction: routed,   policy: deny }
+
+- name: Allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "{{ ssh_port | default('22') }}"
+    proto: tcp
+    comment: "Allow SSH"
+
+- name: Allow HTTP and HTTPS
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"
+
+- name: Rate-limit SSH to prevent brute force
+  community.general.ufw:
+    rule: limit
+    port: "{{ ssh_port | default('22') }}"
+    proto: tcp
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+
+- name: Configure sysctl network hardening
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    reload: true
+  loop:
+    - { name: net.ipv4.conf.all.rp_filter,          value: '1' }
+    - { name: net.ipv4.conf.default.rp_filter,      value: '1' }
+    - { name: net.ipv4.icmp_echo_ignore_broadcasts,  value: '1' }
+    - { name: net.ipv4.conf.all.accept_redirects,   value: '0' }
+    - { name: net.ipv4.conf.all.send_redirects,     value: '0' }

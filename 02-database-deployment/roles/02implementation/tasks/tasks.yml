@@ -1,0 +1,48 @@
+---
+- name: Install PostgreSQL
+  ansible.builtin.package:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+    state: present
+
+- name: Ensure PostgreSQL is started and enabled
+  ansible.builtin.service:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Create application database
+  community.postgresql.postgresql_db:
+    name: "{{ db_name | default('appdb') }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create database user
+  community.postgresql.postgresql_user:
+    name: "{{ db_user | default('appuser') }}"
+    password: "{{ db_password | default('changeme') }}"
+    priv: "{{ db_name | default('appdb') }}:ALL"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Configure pg_hba.conf for app user
+  community.postgresql.postgresql_pg_hba:
+    dest: /etc/postgresql/{{ postgresql_version | default('14') }}/main/pg_hba.conf
+    contype: host
+    databases: "{{ db_name | default('appdb') }}"
+    users: "{{ db_user | default('appuser') }}"
+    address: 127.0.0.1/32
+    method: md5
+  notify: restart postgresql
+
+- name: Set PostgreSQL max_connections
+  community.postgresql.postgresql_set:
+    name: max_connections
+    value: "{{ pg_max_connections | default('200') }}"
+  become: true
+  become_user: postgres
+  notify: restart postgresql

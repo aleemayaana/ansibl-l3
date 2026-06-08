@@ -1,0 +1,17 @@
+---
+- name: Check collectd or node_exporter not already running
+  ansible.builtin.service_facts:
+
+- name: Verify sysstat package availability
+  ansible.builtin.package:
+    name: sysstat
+    state: present
+  check_mode: true
+
+- name: Check disk usage not critical (>90%)
+  ansible.builtin.assert:
+    that:
+      - item.size_available > (item.size_total * 0.1)
+    fail_msg: "Critical disk usage on {{ item.mount }}"
+  loop: "{{ ansible_mounts }}"
+  when: item.mount == '/'

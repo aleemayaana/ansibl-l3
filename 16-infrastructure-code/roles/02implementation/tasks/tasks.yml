@@ -1,0 +1,62 @@
+---
+- name: Install unzip (required for Terraform)
+  ansible.builtin.package:
+    name: unzip
+    state: present
+
+- name: Download and install Terraform
+  ansible.builtin.unarchive:
+    src: "https://releases.hashicorp.com/terraform/{{ terraform_version | default('1.7.0') }}/terraform_{{ terraform_version | default('1.7.0') }}_linux_amd64.zip"
+    dest: /usr/local/bin
+    remote_src: true
+    mode: '0755'
+  when: tf_check.rc != 0
+
+- name: Create IaC project directory
+  ansible.builtin.file:
+    path: /opt/infrastructure
+    state: directory
+    mode: '0750'
+
+- name: Deploy base Terraform structure
+  ansible.builtin.copy:
+    dest: /opt/infrastructure/main.tf
+    content: |
+      terraform {
+        required_version = ">= 1.0"
+        required_providers {
+          aws = {
+            source  = "hashicorp/aws"
+            version = "~> 5.0"
+          }
+        }
+        backend "s3" {
+          bucket = "{{ tf_state_bucket | default('my-tf-state') }}"
+          key    = "infrastructure/terraform.tfstate"
+          region = "{{ aws_region | default('us-east-1') }}"
+        }
+      }
+
+- name: Deploy variables file
+  ansible.builtin.copy:
+    dest: /opt/infrastructure/variables.tf
+    content: |
+      variable "environment" {
+        description = "Deployment environment"
+        type        = string
+        default     = "{{ environment | default('dev') }}"
+      }
+
+      variable "region" {
+        description = "Cloud region"
+        type        = string
+        default     = "{{ aws_region | default('us-east-1') }}"
+      }
+
+- name: Initialize Terraform
+  ansible.builtin.command:
+    cmd: terraform init
+    chdir: /opt/infrastructure
+  register: tf_init
+  changed_when: "'Terraform has been successfully initialized' in tf_init.stdout"
+  ignore_errors: true

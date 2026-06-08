@@ -1,0 +1,3 @@
+---
+- name: Run 01precheck tasks
+  ansible.builtin.import_tasks: tasks.yml

@@ -1,0 +1,36 @@
+---
+- name: Verify git installed
+  ansible.builtin.command: git --version
+  register: git_ver
+  changed_when: false
+  failed_when: git_ver.rc != 0
+
+- name: Verify Python3 installed
+  ansible.builtin.command: python3 --version
+  register: python_ver
+  changed_when: false
+  failed_when: python_ver.rc != 0
+
+- name: Verify Node.js installed
+  ansible.builtin.command: node --version
+  register: node_ver
+  changed_when: false
+  ignore_errors: true
+
+- name: Display installed tool versions
+  ansible.builtin.debug:
+    msg:
+      - "Git: {{ git_ver.stdout }}"
+      - "Python: {{ python_ver.stdout }}"
+      - "Node: {{ node_ver.stdout | default('not installed') }}"
+
+- name: Verify workspace directory
+  ansible.builtin.stat:
+    path: "{{ developer_workspace | default('~/workspace') }}"
+  register: workspace
+
+- name: Assert workspace exists
+  ansible.builtin.assert:
+    that:
+      - workspace.stat.exists
+      - workspace.stat.isdir

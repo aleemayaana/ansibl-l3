@@ -1,0 +1,78 @@
+---
+- name: Install Java runtime (app tier)
+  ansible.builtin.package:
+    name:
+      - openjdk-17-jre-headless
+      - maven
+    state: present
+
+- name: Create app user
+  ansible.builtin.user:
+    name: appuser
+    system: true
+    shell: /bin/false
+    home: /opt/app
+
+- name: Create application directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: appuser
+    mode: '0750'
+  loop:
+    - /opt/app
+    - /opt/app/config
+    - /opt/app/logs
+    - /opt/app/data
+
+- name: Deploy application config
+  ansible.builtin.template:
+    src: application.properties.j2
+    dest: /opt/app/config/application.properties
+    owner: appuser
+    mode: '0640'
+
+- name: Deploy application systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/app.service
+    content: |
+      [Unit]
+      Description=Multi-tier Application
+      After=network.target postgresql.service
+
+      [Service]
+      User=appuser
+      WorkingDirectory=/opt/app
+      ExecStart=/usr/bin/java -jar /opt/app/app.jar --spring.config.location=/opt/app/config/
+      SuccessExitStatus=143
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - reload systemd
+    - restart app
+
+- name: Configure nginx reverse proxy
+  ansible.builtin.copy:
+    dest: /etc/nginx/sites-available/app.conf
+    content: |
+      upstream app_backend {
+        server 127.0.0.1:8080;
+      }
+
+      server {
+        listen 80;
+        server_name {{ app_domain | default('_') }};
+
+        location / {
+          proxy_pass http://app_backend;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_connect_timeout 60s;
+          proxy_read_timeout 60s;
+        }
+      }
+  notify: reload nginx

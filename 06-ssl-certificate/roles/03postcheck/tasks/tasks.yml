@@ -1,0 +1,27 @@
+---
+- name: Check certificate file exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ domain_name | default('example.com') }}/fullchain.pem"
+  register: cert_file
+
+- name: Assert certificate was created
+  ansible.builtin.assert:
+    that:
+      - cert_file.stat.exists
+    fail_msg: "SSL certificate not found"
+
+- name: Verify certificate expiry
+  ansible.builtin.command:
+    cmd: "openssl x509 -enddate -noout -in /etc/letsencrypt/live/{{ domain_name | default('example.com') }}/fullchain.pem"
+  register: cert_expiry
+  changed_when: false
+
+- name: Display certificate expiry
+  ansible.builtin.debug:
+    var: cert_expiry.stdout
+
+- name: Verify HTTPS responds on port 443
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 443
+    timeout: 10

@@ -1,0 +1,50 @@
+---
+- name: Install metrics collection tools
+  ansible.builtin.package:
+    name:
+      - sysstat
+      - iostat
+      - dstat
+      - htop
+      - iotop
+    state: present
+
+- name: Enable sysstat collection
+  ansible.builtin.lineinfile:
+    path: /etc/default/sysstat
+    regexp: '^ENABLED'
+    line: 'ENABLED="true"'
+  notify: restart sysstat
+
+- name: Install Node Exporter
+  ansible.builtin.unarchive:
+    src: "https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz"
+    dest: /usr/local/bin
+    remote_src: true
+    extra_opts: ['--strip-components=1']
+    include: ['*/node_exporter']
+
+- name: Create Node Exporter systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/node_exporter.service
+    content: |
+      [Unit]
+      Description=Prometheus Node Exporter
+      After=network.target
+
+      [Service]
+      User=nobody
+      ExecStart=/usr/local/bin/node_exporter
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - reload systemd
+    - restart node_exporter
+
+- name: Enable and start Node Exporter
+  ansible.builtin.service:
+    name: node_exporter
+    state: started
+    enabled: true

@@ -1,0 +1,29 @@
+---
+- name: Verify app service is running
+  ansible.builtin.service_facts:
+
+- name: Assert app service active
+  ansible.builtin.assert:
+    that:
+      - "'app' in services"
+      - "services['app'].state == 'running'"
+
+- name: Wait for app to be ready on port 8080
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 8080
+    timeout: 60
+
+- name: Verify health endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:8080/actuator/health"
+    return_content: true
+  register: health_check
+  ignore_errors: true
+
+- name: Verify nginx proxies to app
+  ansible.builtin.uri:
+    url: http://localhost
+    return_content: false
+  register: nginx_check
+  failed_when: nginx_check.status not in [200, 301, 302]

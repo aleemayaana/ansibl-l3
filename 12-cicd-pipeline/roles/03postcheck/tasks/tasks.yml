@@ -1,0 +1,33 @@
+---
+- name: Wait for Jenkins to start
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 8080
+    timeout: 120
+
+- name: Verify Jenkins login page is up
+  ansible.builtin.uri:
+    url: http://localhost:8080/login
+    return_content: false
+  register: jenkins_check
+  failed_when: jenkins_check.status not in [200, 303]
+
+- name: Read Jenkins initial admin password
+  ansible.builtin.command: cat /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_password
+  changed_when: false
+  ignore_errors: true
+
+- name: Display Jenkins initial password
+  ansible.builtin.debug:
+    msg: "Jenkins initial admin password: {{ jenkins_password.stdout }}"
+  when: jenkins_password.rc == 0
+
+- name: Verify Jenkins service is enabled
+  ansible.builtin.service_facts:
+
+- name: Assert Jenkins is active
+  ansible.builtin.assert:
+    that:
+      - "'jenkins' in services"
+      - "services['jenkins'].state == 'running'"

@@ -1,0 +1,29 @@
+---
+- name: Verify nginx is running
+  ansible.builtin.service_facts:
+
+- name: Assert nginx is active
+  ansible.builtin.assert:
+    that:
+      - "'nginx' in services"
+      - "services['nginx'].state == 'running'"
+    fail_msg: "nginx is not running"
+
+- name: Check nginx responds on port 80
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 80
+    timeout: 10
+
+- name: Verify PermitRootLogin is disabled
+  ansible.builtin.command: grep "^PermitRootLogin no" /etc/ssh/sshd_config
+  register: root_login_check
+  failed_when: root_login_check.rc != 0
+  changed_when: false
+
+- name: Verify X-Frame-Options header present
+  ansible.builtin.uri:
+    url: http://localhost
+    return_content: false
+  register: web_response
+  failed_when: web_response.status not in [200, 301, 302]

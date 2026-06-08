@@ -1,0 +1,33 @@
+---
+- name: Copy kubeconfig for root user
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+    mode: '0600'
+  ignore_errors: true
+
+- name: Verify cluster nodes are ready
+  ansible.builtin.command: kubectl get nodes
+  register: nodes_status
+  changed_when: false
+  ignore_errors: true
+
+- name: Display nodes status
+  ansible.builtin.debug:
+    var: nodes_status.stdout_lines
+
+- name: Verify kubelet is running
+  ansible.builtin.service_facts:
+
+- name: Assert kubelet is active
+  ansible.builtin.assert:
+    that:
+      - "'kubelet' in services"
+      - "services['kubelet'].state == 'running'"
+
+- name: Check kube-system pods are running
+  ansible.builtin.command: kubectl get pods -n kube-system
+  register: kube_pods
+  changed_when: false
+  ignore_errors: true

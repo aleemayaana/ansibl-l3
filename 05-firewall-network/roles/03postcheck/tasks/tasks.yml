@@ -1,0 +1,31 @@
+---
+- name: Check UFW is active
+  ansible.builtin.command: ufw status
+  register: ufw_active
+  changed_when: false
+
+- name: Assert UFW is active
+  ansible.builtin.assert:
+    that:
+      - "'Status: active' in ufw_active.stdout"
+    fail_msg: "UFW is not active"
+
+- name: Verify SSH rule exists
+  ansible.builtin.command: ufw status numbered
+  register: ufw_rules
+  changed_when: false
+
+- name: Assert SSH is allowed
+  ansible.builtin.assert:
+    that:
+      - "'22' in ufw_rules.stdout or '{{ ssh_port | default(\"22\") }}' in ufw_rules.stdout"
+
+- name: Verify sysctl rp_filter is set
+  ansible.builtin.command: sysctl net.ipv4.conf.all.rp_filter
+  register: rp_filter
+  changed_when: false
+
+- name: Assert rp_filter enabled
+  ansible.builtin.assert:
+    that:
+      - "'= 1' in rp_filter.stdout"

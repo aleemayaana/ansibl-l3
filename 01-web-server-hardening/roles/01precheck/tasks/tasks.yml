@@ -1,0 +1,28 @@
+---
+- name: Check OS is supported
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family in ['RedHat', 'Debian']
+    fail_msg: "Unsupported OS: {{ ansible_os_family }}"
+
+- name: Check minimum RAM (512MB)
+  ansible.builtin.assert:
+    that:
+      - ansible_memtotal_mb >= 512
+    fail_msg: "Insufficient RAM: {{ ansible_memtotal_mb }}MB"
+
+- name: Check if port 80/443 are not already in use by another service
+  ansible.builtin.wait_for:
+    port: "{{ item }}"
+    state: stopped
+    timeout: 5
+  ignore_errors: true
+  loop: [80, 443]
+
+- name: Ensure required packages are available
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - curl
+    - openssl

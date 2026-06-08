@@ -1,0 +1,16 @@
+---
+- name: Verify /etc/sudoers is valid
+  ansible.builtin.command: visudo -c
+  register: sudoers_check
+  changed_when: false
+  failed_when: sudoers_check.rc != 0
+
+- name: Collect existing users
+  ansible.builtin.getent:
+    database: passwd
+
+- name: Check PAM is installed
+  ansible.builtin.package:
+    name: libpam-runtime
+    state: present
+  check_mode: true

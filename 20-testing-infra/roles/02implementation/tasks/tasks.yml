@@ -1,0 +1,85 @@
+---
+- name: Install testing dependencies
+  ansible.builtin.package:
+    name:
+      - python3-pip
+      - python3-venv
+      - python3-dev
+    state: present
+
+- name: Install Ansible testing tools
+  ansible.builtin.pip:
+    name:
+      - molecule
+      - molecule-docker
+      - pytest
+      - pytest-testinfra
+      - ansible-lint
+    state: present
+
+- name: Create test infrastructure directory
+  ansible.builtin.file:
+    path: /opt/testing
+    state: directory
+    mode: '0755'
+
+- name: Deploy ansible-lint configuration
+  ansible.builtin.copy:
+    dest: /opt/testing/.ansible-lint
+    content: |
+      profile: production
+      exclude_paths:
+        - .cache/
+      warn_list:
+        - no-changed-when
+      skip_list:
+        - yaml[line-length]
+    mode: '0644'
+
+- name: Deploy pytest configuration
+  ansible.builtin.copy:
+    dest: /opt/testing/pytest.ini
+    content: |
+      [pytest]
+      addopts = -v --tb=short
+      testpaths = tests
+    mode: '0644'
+
+- name: Create sample test file
+  ansible.builtin.copy:
+    dest: /opt/testing/tests/test_infrastructure.py
+    content: |
+      import testinfra
+
+      def test_sshd_running(host):
+          sshd = host.service("sshd")
+          assert sshd.is_running
+          assert sshd.is_enabled
+
+      def test_no_root_ssh(host):
+          sshd_config = host.file("/etc/ssh/sshd_config")
+          assert sshd_config.contains("PermitRootLogin no")
+
+      def test_firewall_active(host):
+          ufw = host.run("ufw status")
+          assert "Status: active" in ufw.stdout
+    mode: '0644'
+
+- name: Deploy molecule scenario for roles
+  ansible.builtin.copy:
+    dest: /opt/testing/molecule/default/molecule.yml
+    content: |
+      ---
+      dependency:
+        name: galaxy
+      driver:
+        name: docker
+      platforms:
+        - name: instance
+          image: "{{ molecule_image | default('ubuntu:22.04') }}"
+          pre_build_image: true
+      provisioner:
+        name: ansible
+      verifier:
+        name: ansible
+    mode: '0644'

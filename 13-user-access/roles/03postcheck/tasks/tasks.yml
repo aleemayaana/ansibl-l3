@@ -1,0 +1,25 @@
+---
+- name: Verify sudoers file is valid
+  ansible.builtin.command: visudo -c
+  register: sudoers_valid
+  changed_when: false
+  failed_when: sudoers_valid.rc != 0
+
+- name: Verify ops sudoers file is valid
+  ansible.builtin.command: visudo -cf /etc/sudoers.d/ops
+  register: ops_sudoers
+  changed_when: false
+  failed_when: ops_sudoers.rc != 0
+
+- name: Check password policy is applied
+  ansible.builtin.command: grep "minlen = 14" /etc/security/pwquality.conf
+  register: pwquality_check
+  changed_when: false
+  failed_when: pwquality_check.rc != 0
+
+- name: Verify managed users exist
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ item.name }}"
+  loop: "{{ managed_users | default([]) }}"
+  ignore_errors: true

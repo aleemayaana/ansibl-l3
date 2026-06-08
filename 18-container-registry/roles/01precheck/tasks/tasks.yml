@@ -1,0 +1,23 @@
+---
+- name: Check Docker is installed
+  ansible.builtin.service_facts:
+
+- name: Assert Docker is running
+  ansible.builtin.assert:
+    that:
+      - "'docker' in services"
+      - "services['docker'].state == 'running'"
+    fail_msg: "Docker must be running before deploying registry"
+
+- name: Check port 5000 is free
+  ansible.builtin.wait_for:
+    port: 5000
+    state: stopped
+    timeout: 5
+  ignore_errors: true
+
+- name: Verify SSL certificate exists for registry
+  ansible.builtin.stat:
+    path: "{{ registry_cert | default('/etc/ssl/registry/registry.crt') }}"
+  register: reg_cert
+  ignore_errors: true

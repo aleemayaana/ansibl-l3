@@ -1,0 +1,60 @@
+---
+- name: Create license directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0750'
+    owner: root
+  loop:
+    - /etc/licenses
+    - /var/log/license-audit
+    - /opt/license-manager
+
+- name: Deploy license inventory script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/license-audit.sh
+    mode: '0750'
+    content: |
+      #!/bin/bash
+      LOG="/var/log/license-audit/audit_$(date +%Y%m%d).log"
+      echo "=== License Audit: $(date) ===" >> "$LOG"
+
+      # Audit installed software
+      echo "--- Installed Packages ---" >> "$LOG"
+      dpkg -l 2>/dev/null | grep -E "^ii" >> "$LOG" || rpm -qa >> "$LOG"
+
+      # Check license files
+      echo "--- License Files ---" >> "$LOG"
+      find /etc/licenses -name "*.lic" -exec ls -la {} \; >> "$LOG"
+
+      echo "=== Audit Complete ===" >> "$LOG"
+
+- name: Schedule weekly license audit
+  ansible.builtin.cron:
+    name: "Weekly license audit"
+    minute: "0"
+    hour: "6"
+    weekday: "1"
+    job: "/usr/local/bin/license-audit.sh"
+    user: root
+
+- name: Deploy license expiry checker
+  ansible.builtin.copy:
+    dest: /usr/local/bin/check-license-expiry.sh
+    mode: '0750'
+    content: |
+      #!/bin/bash
+      WARN_DAYS={{ license_warn_days | default(30) }}
+      TODAY=$(date +%s)
+
+      for lic in /etc/licenses/*.lic; do
+        [ -f "$lic" ] || continue
+        EXPIRY=$(grep -i "expiry\|expire" "$lic" | grep -oP '\d{4}-\d{2}-\d{2}' | head -1)
+        if [ -n "$EXPIRY" ]; then
+          EXPIRY_TS=$(date -d "$EXPIRY" +%s)
+          DAYS_LEFT=$(( (EXPIRY_TS - TODAY) / 86400 ))
+          if [ $DAYS_LEFT -lt $WARN_DAYS ]; then
+            echo "WARNING: License $lic expires in $DAYS_LEFT days ($EXPIRY)"
+          fi
+        fi
+      done

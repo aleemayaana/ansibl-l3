@@ -1,0 +1,36 @@
+---
+- name: Verify license directories exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: dir_check
+  loop:
+    - /etc/licenses
+    - /var/log/license-audit
+
+- name: Assert directories present
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isdir
+  loop: "{{ dir_check.results }}"
+
+- name: Run license audit test
+  ansible.builtin.command: /usr/local/bin/license-audit.sh
+  register: audit_test
+  changed_when: false
+
+- name: Assert audit ran successfully
+  ansible.builtin.assert:
+    that:
+      - audit_test.rc == 0
+
+- name: Verify audit log was created
+  ansible.builtin.find:
+    paths: /var/log/license-audit
+    patterns: "audit_*.log"
+  register: audit_logs
+
+- name: Assert audit log exists
+  ansible.builtin.assert:
+    that:
+      - audit_logs.matched > 0

@@ -1,0 +1,8 @@
+---
+- name: 07 Monitoring Stack
+  hosts: all
+  gather_facts: true
+  roles:
+    - role: 01precheck
+    - role: 02implementation
+    - role: 03postcheck

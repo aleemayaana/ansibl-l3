@@ -1,0 +1,56 @@
+---
+- name: Create registry directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0750'
+  loop:
+    - /opt/registry
+    - /opt/registry/data
+    - /opt/registry/certs
+    - /opt/registry/auth
+
+- name: Generate self-signed cert for registry
+  ansible.builtin.command:
+    cmd: >
+      openssl req -newkey rsa:4096 -nodes -sha256
+      -keyout /opt/registry/certs/domain.key
+      -x509 -days 365
+      -out /opt/registry/certs/domain.crt
+      -subj "/CN={{ registry_domain | default('registry.local') }}"
+    creates: /opt/registry/certs/domain.crt
+
+- name: Create htpasswd for registry auth
+  ansible.builtin.command:
+    cmd: >
+      docker run --rm --entrypoint htpasswd
+      httpd:2 -Bbn
+      {{ registry_user | default('admin') }}
+      {{ registry_password | default('changeme') }}
+  register: htpasswd_output
+  changed_when: true
+
+- name: Write htpasswd file
+  ansible.builtin.copy:
+    dest: /opt/registry/auth/htpasswd
+    content: "{{ htpasswd_output.stdout }}"
+    mode: '0640'
+
+- name: Deploy registry container
+  community.docker.docker_container:
+    name: registry
+    image: registry:2
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - /opt/registry/data:/var/lib/registry
+      - /opt/registry/certs:/certs
+      - /opt/registry/auth:/auth
+    env:
+      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/domain.crt
+      REGISTRY_HTTP_TLS_KEY: /certs/domain.key
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd

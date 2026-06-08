@@ -1,0 +1,8 @@
+---
+- name: 06 Ssl Certificate
+  hosts: all
+  gather_facts: true
+  roles:
+    - role: 01precheck
+    - role: 02implementation
+    - role: 03postcheck

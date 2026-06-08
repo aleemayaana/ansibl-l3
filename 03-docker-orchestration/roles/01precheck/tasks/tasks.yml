@@ -1,0 +1,24 @@
+---
+- name: Check kernel version supports Docker
+  ansible.builtin.assert:
+    that:
+      - ansible_kernel is version('3.10', '>=')
+    fail_msg: "Kernel {{ ansible_kernel }} too old for Docker"
+
+- name: Check available disk space (min 10GB)
+  ansible.builtin.assert:
+    that:
+      - item.size_available > 10737418240
+    loop: "{{ ansible_mounts }}"
+    when: item.mount == '/'
+
+- name: Check Docker not already installed
+  ansible.builtin.command: docker --version
+  register: docker_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Report existing Docker version
+  ansible.builtin.debug:
+    msg: "Docker already installed: {{ docker_check.stdout }}"
+  when: docker_check.rc == 0
